@@ -1,0 +1,31 @@
+name: Daily Fortune Bot
+
+on:
+  schedule:
+    # 毎日UTC（世界標準時）の 24:00（日本時間の朝 9:00）に実行
+    - cron: '0 0 * * *'
+  # 手動でも実行できるようにする設定
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run script
+        env:
+          # LINEのトークンやIDを安全にプログラムに渡す設定
+          CHANNEL_ACCESS_TOKEN: ${{ secrets.CHANNEL_ACCESS_TOKEN }}
+          MY_USER_ID: ${{ secrets.MY_USER_ID }}
+        run: python main.py
