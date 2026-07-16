@@ -7,7 +7,6 @@ from linebot.models import TextSendMessage
 # ==========================================
 # 1. 各種設定（環境変数 / GitHub Secrets から安全に取得）
 # ==========================================
-# 【安全性向上】大切な情報はすべてプログラムの外（シークレット）からのみ取得します
 CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN')
 MY_USER_ID = os.getenv('MY_USER_ID')
 
@@ -18,7 +17,7 @@ birth_date_str = os.getenv('BIRTH_DATE', '1998-10-15')
 # 2. 数秘術（ヌメロロジー）の計算ロジック
 # ==========================================
 def get_single_digit_sum(number_str):
-    """数字の文字列を受け取り、1桁になるまで（11, 22, 33は残す）各桁を足し算する"""
+    """数字の文字列を受け取り、1桁になるまで各桁を足し算する"""
     while len(number_str) > 1:
         if number_str in ["11", "22", "33"]:
             return int(number_str)
@@ -29,20 +28,16 @@ def get_single_digit_sum(number_str):
 def calculate_personal_day_number(birth_str, target_date):
     """生年月日と指定日の日付から、その日の「個人サイクル数」を計算する"""
     try:
-        # YYYY-MM-DD の形式を読み込む
         birth = datetime.strptime(birth_str, "%Y-%m-%d")
     except Exception:
-        # 万が一、シークレットの登録形式が違った場合のセーフティ
         birth = datetime(1998, 10, 15)
     
-    # 誕生月 + 誕生日 + 占いたい年の各桁をすべて足す
     year_digits = str(target_date.year)
     month_digits = str(birth.month)
     day_digits = str(birth.day)
     
     personal_year = get_single_digit_sum(year_digits + month_digits + day_digits)
     
-    # さらに、占いたい日の「月」と「日」を足す
     target_month_day = str(target_date.month) + str(target_date.day)
     personal_day = get_single_digit_sum(str(personal_year) + target_month_day)
     
@@ -51,11 +46,66 @@ def calculate_personal_day_number(birth_str, target_date):
         
     return personal_day
 
-# 今日の日付で個人サイクルを計算
+# ==========================================
+# 3. 九星気学の計算ロジック
+# ==========================================
+def calculate_honmei_sei(birth_str):
+    """生年月日から「本命星」を計算する（簡易版：立春のズレは考慮せず西暦年で計算します）"""
+    try:
+        birth = datetime.strptime(birth_str, "%Y-%m-%d")
+    except Exception:
+        birth = datetime(1998, 10, 15)
+    
+    year = birth.year
+    # 生まれた年の各桁を足し合わせ、1桁になるまで足す
+    year_sum = sum(int(digit) for digit in str(year))
+    while year_sum >= 10:
+        year_sum = sum(int(digit) for digit in str(year_sum))
+    
+    # 本命星の割り出し（男性・女性共通の簡易式）
+    # 西暦の各桁の和を10から引く（引ききれない場合は調整）
+    star_num = 11 - year_sum
+    if star_num > 9:
+        star_num -= 9
+    elif star_num < 1:
+        star_num += 9
+        
+    stars = {
+        1: "一白水星 (いっぱくすいせい)",
+        2: "二黒土星 (じこくどせい)",
+        3: "三碧木星 (さんぺきもくせい)",
+        4: "四緑木星 (しろくもくせい)",
+        5: "五黄土星 (ごおうどせい)",
+        6: "六白金星 (ろっぱくきんせい)",
+        7: "七赤金星 (しちせききんせい)",
+        8: "八白土星 (はっぱくどせい)",
+        9: "九紫火星 (きゅうしかせい)"
+    }
+    return stars.get(star_num, "一白水星 (いっぱくすいせい)")
+
+def get_lucky_direction(target_date):
+    """今日の日付を元に、ラッキーな吉方位とアクションを1つ選ぶ"""
+    directions = [
+        {"dir": "東 (East)", "action": "新しいカフェやショップに寄ると、素敵なインスピレーションが湧きそう！🛒"},
+        {"dir": "西 (West)", "action": "美味しいスイーツを食べたり、おしゃべりを楽しんだりすると、ハッピーな情報をキャッチできそう。🍰"},
+        {"dir": "南 (South)", "action": "おしゃれをして出かけると吉。ビューティー運が上がっている日です。💄"},
+        {"dir": "北 (North)", "action": "静かで落ち着ける場所（図書館や公園など）に行くと、心がすっきり整います。🧘‍♀️"},
+        {"dir": "南東 (Southeast)", "action": "遠出のお出かけや、連絡を長らく取っていなかった友達に連絡すると、良縁に恵まれます。💌"},
+        {"dir": "北西 (Northwest)", "action": "ちょっと高級な場所や、いつもより背伸びしたお店に行くと仕事運やステータス運がUPします。✨"},
+        {"dir": "北東 (Northeast)", "action": "普段行かない新しいルートを散歩してみて。変化を味方にできる日です。🚶‍♀️"},
+        {"dir": "南西 (Southwest)", "action": "お家を綺麗にするための買い物や、地元でのんびり過ごすと家庭運・健康運が安定します。🏡"}
+    ]
+    # 日付の「日」を基準に、毎日違う方位が選ばれるようにする
+    random_index = (target_date.day + target_date.month) % len(directions)
+    return directions[random_index]
+
+# 各種占いの実行
 today = datetime.now()
 personal_day_num = calculate_personal_day_number(birth_date_str, today)
+honmei_sei = calculate_honmei_sei(birth_date_str)
+lucky_dir_info = get_lucky_direction(today)
 
-# 各数字（1〜9）が持つ「今日のテーマ」
+# 数秘術のメッセージ
 numerology_meanings = {
     1: "【1：スタート・発展】\n新しいことを始めるのに最適な日！直感に従って即行動が吉です。🚀",
     2: "【2：協調・つながり】\n周りの人の意見をじっくり聞くと良い日。思いやりが運気を呼び込みます。🤝",
@@ -67,33 +117,23 @@ numerology_meanings = {
     8: "【8：豊かさ・収穫】\nこれまでの努力が形になって現れるパワフルな日。自信を持って進もう！🏆🌟",
     9: "【9：完結・整理】\n不要になったものや考えを手放し、次のサイクルに向けて心を整理する日。🧹✨"
 }
-
 today_numerology_message = numerology_meanings.get(personal_day_num, "【穏やかな日】のんびり過ごしましょう。☕️")
 
 # ==========================================
-# 3. おみくじ（ランダム）
-# ==========================================
-fortunes = [
-    "今日の運勢は【大吉】！最高の1日になりそうです。ラッキーアイテムはコーヒー☕️",
-    "今日の運勢は【中吉】！一歩一歩進めば良いことがあります。ラッキーカラーは青色💙",
-    "今日の運勢は【小吉】！のんびりマイペースにいきましょう。ラッキーフードはリンゴ🍎"
-]
-today_fortune = random.choice(fortunes)
-
-# ==========================================
-# 4. メッセージの合体
+# 4. メッセージの合体（おみくじを廃止し、本命星と吉方位を追加）
 # ==========================================
 final_message = (
     "🔮 ジュリさん専用・今日の運勢鑑定 🔮\n\n"
-    f"{today_fortune}\n\n"
-    "🔢 【数秘術から届くメッセージ】\n"
+    f"☯️ 【九星気学（本命星：{honmei_sei}）】\n"
+    f"📍 今日の吉方位：{lucky_dir_info['dir']}\n"
+    f"💡 アドバイス：{lucky_dir_info['action']}\n\n"
+    "🔢 【数秘術のデイリーサイクル】\n"
     f"{today_numerology_message}"
 )
 
 # ==========================================
 # 5. LINEに送信する
 # ==========================================
-# 安全確認：トークンやIDが空っぽの場合は、LINE送信せずに画面表示だけにする（手元でのテスト用）
 if not CHANNEL_ACCESS_TOKEN or not MY_USER_ID:
     print("--- [テスト実行モード] ---")
     print("※LINEの接続情報がローカルPCにないため、送信メッセージのプレビューを表示します：\n")
@@ -104,6 +144,6 @@ else:
     try:
         line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
         line_bot_api.push_message(MY_USER_ID, TextSendMessage(text=final_message))
-        print("LINEに数秘術付きの占いを送信しました！スマホを確認してみてね。")
+        print("LINEに「九星気学＆数秘術」占いを送信しました！")
     except Exception as e:
         print(f"エラーが発生しました: {e}")
